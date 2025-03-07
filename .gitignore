@@ -5,10 +5,6 @@ lune_packages
 luau_packages
 pesde.lock
 
-# Vite
-node_modules
-docs/.vitepress/cache
-
 # Rojo
 sourcemap.json
 
@@ -17,3 +13,6 @@ out
 
 # Code
 .vscode
+
+# Rokit
+rokit.toml

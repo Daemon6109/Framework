@@ -1,204 +1,153 @@
--- Variables
-local Types = require(script.types)
-local Logs = require(script.logs)
-local Spawn = require(script.spawn)
-local Debugger = require(script.Parent.roblox_packages.debugger)
+-------------------------------------------------------------------------------
+-- framework.luau
+-- A framework for managing providers in Roblox with dependency handling and profiling.
+--------------------------------------------------------------------------------
 
-local assert = Debugger.assert
-local fatal = Debugger.fatal
+local version = { major = 1, minor = 0, patch = 0 }
 
-local Started = false
-local Profiling = false
-local ProviderCount = 0
+local debugger = require(script.Parent.roblox_packages.debugger)
 
--- Names that have been already claimed by other providers
-local ProviderNames: { string } = {}
--- Names that are reserved for the framework only
-local ReservedNames: { string } = { "Init", "Start", "Uses", "Order", "Name" }
--- Providers imported using the Add function
-local AddedProviders: { Types.Provider<any> } = {}
--- Lifecycles created using the Lifecycle function
-local AddedLifecycles: { Types.Lifecycle<...any> } = {}
--- Providers that have been loaded already
-local InitiatedProviders: { Types.Provider<any> } = {}
+-- Define the Provider type with specific fields
+type Provider = {
+	init: (() -> ())?, -- Optional initialization function
+	name: string, -- Name of the provider
+	start: (() -> ())?, -- Optional start function
+}
 
--- Functions
+local assert: <T>(T, string, ...any) -> T = debugger.assert
+local fatal = debugger.fatal
 
--- Adds the the callback from the provider to the lifecycle listeners
-local function StartLifecycles(provider: Provider<any>)
-	for _, lifecycle in AddedLifecycles do
-		if (provider :: any)[lifecycle.Name] and type((provider :: any)[lifecycle.Name]) == "function" then -- Check if the provider has a lifecycle
-			-- Add the lifecycle callback to the listeners of it
-			table.insert(lifecycle.Listeners, (provider :: any)[lifecycle.Name])
+-- Framework object to manage providers
+local framework = {
+	STARTED = false, -- Tracks if the framework has started
+	PROFILING = false, -- Enables memory profiling if true
+	ADDED_PROVIDERS = {} :: { Provider }, -- Stores all added providers
+	INITIATED_PROVIDERS = {} :: { Provider }, -- Stores providers that have been initialized
+
+	-- Centralized error messages
+	LOGS = {
+		AlreadyStarted = "Framework has already started",
+		FatalInit = "Init errored: %s",
+		FatalAddModule = "Added module errored: %s",
+		ReservedName = "'%s' is a reserved %s name",
+		InvalidType = "Expected type %s; got '%s'",
+	},
+}
+
+type Framework = typeof(framework)
+
+--[=[
+	@method IsInitiated
+	@within Framework
+	@param provider: Provider
+	@return boolean
+	Helper function to check if a provider has been initiated
+]=]
+function framework.IsInitiated(self: Framework, provider: Provider): boolean
+	return table.find(self.INITIATED_PROVIDERS, provider) ~= nil
+end
+
+--[=[
+    @method StartProvider
+    @within Framework 
+    @param provider: Provider
+    Starts the provider if it has a start function.
+]=]
+function framework.StartProvider(self: Framework, provider: Provider)
+	if provider.start then
+		local argType = type(provider.start)
+		assert(argType == "function", "InvalidType", "function", argType)
+		if self.PROFILING then
+			debug.setmemorycategory(provider.name)
 		end
+		provider.start()
 	end
 end
 
--- Starts a provider
-local function StartProvider(provider: Provider<any>)
-	if provider.Start then
-		-- Ensure prop is the correct type
-		local argType = type(provider.Start)
+--[=[
+    @method InitProvider
+    @within Framework 
+    @param provider: Provider
+    Initializes the provider if it has an init function and hasn't been initiated yet.
+]=]
+function framework.InitProvider(self: Framework, provider: Provider)
+	if provider.init and not self:IsInitiated(provider) then
+		local argType = type(provider.init)
 		assert(argType == "function", "InvalidType", "function", argType)
-		-- Start the provider
-		if Profiling then
-			debug.setmemorycategory(provider.Name)
-		end
-		Spawn(provider.Start)
-	end
-end
-
--- Inits a provider
-local function InitProvider(provider: Provider<any>)
-	if provider.Init and not table.find(InitiatedProviders, provider) then
-		-- Ensure prop is the correct type
-		local argType = type(provider.Init)
-		assert(argType == "function", "InvalidType", "function", argType)
-
-		-- Use custom pcall to supply error to fatal debug
-		local success, result: Debugger.ParsedError = xpcall(function()
-			-- Init the provider
-			if Profiling then
-				debug.setmemorycategory(provider.Name)
+		local success, result: debugger.ParsedError = xpcall(function()
+			if self.PROFILING then
+				debug.setmemorycategory(provider.name)
 			end
-			(provider :: any).Init()
-		end, Debugger.parse)
-
+			provider.init()
+		end, debugger.parse)
 		if not success then
-			fatal("FatalInit", result.Message) -- If there was an error, share it with the user
+			fatal("FatalInit", result.Message)
 		end
 	end
-	table.insert(InitiatedProviders, provider) -- Add to the loaded providers table
-end
-
--- Inits the dependencies of a provider (deep indexing)
-local function InitDependencies(provider: Provider<any>)
-	if provider.Uses then
-		-- Ensure prop is the correct type
-		local argType = type(provider.Uses)
-		assert(argType == "table", "InvalidType", "table", argType)
-
-		for _, usedProvider in provider.Uses :: any do
-			if usedProvider.Init and not table.find(InitiatedProviders, usedProvider) then
-				InitDependencies(usedProvider) -- Check if there are more dependencies nested
-				InitProvider(usedProvider) -- Load the dependency
-			end
-		end
-	end
+	table.insert(self.INITIATED_PROVIDERS, provider)
 end
 
 --[=[
-	Creates a new lifecycle that hooks onto already existing provider methods.
+    @method Add
+    @within Framework
+    @param providers: { Instance }
+    Adds providers to the framework to be initialized and started.
 
-	[Open Documentation](https://lumin-org.github.io/framework/api/#lifecycle)
-]=]
-local function Lifecycle<T...>(name: string, callback: ((self: Lifecycle<T...>, ...any) -> ())?): Lifecycle<T...>
-	assert(not Started, "AlreadyStarted")
-	assert(not table.find(ReservedNames, name), "ReservedName", name, "lifecycle")
-	local Lifecycle = table.freeze({
-		Name = name :: string,
-		Listeners = {},
-		Fire = callback or function(self: Lifecycle<T...>, ...: any)
-			for _, listener in self.Listeners do
-				Spawn(listener, ...)
-			end
-		end,
-		Disconnect = function(self: Lifecycle<T...>)
-			table.clear(self.Listeners)
-			table.freeze(self.Listeners)
-		end,
+	```lua
+	framework.add({
+		script.Parent.MyProvider,
 	})
-	table.insert(AddedLifecycles, Lifecycle)
-	return Lifecycle
-end
-
---[=[
-	Adds all of the modules located within the specified dirs to the framework loading stack.
-
-	[Open Documentation](https://lumin-org.github.io/framework/api/#add)
+	```
 ]=]
-local function Add(dirs: { Instance }, filter: ((ModuleScript) -> boolean)?)
-	assert(not Started, "AlreadyStarted")
-
-	for _, dir in dirs do
-		for _, module in dir:GetChildren() do
-			if not module:IsA("ModuleScript") then
-				continue
-			end
-
-			if filter and not filter(module) then
-				continue
-			end
-
-			local success, result = pcall(require, module)
-			assert(success, "FatalAddModule", result)
-			table.insert(AddedProviders, result)
+function framework.Add(providers: { Instance })
+	assert(not framework.STARTED, "AlreadyStarted")
+	for _, module in providers do
+		if not module:IsA("ModuleScript") then
+			continue
 		end
+		local success, result = pcall(require, module)
+		assert(success, "FatalAddModule", result)
+		assert(type(result) == "table", "InvalidType", "table", type(result))
+		result.name = module.Name
+		result.order = result.order or 1
+		table.insert(framework.ADDED_PROVIDERS, result)
 	end
 end
 
 --[=[
-	Starts the framework, loading all the created Providers.
+    @method Start
+    @within Framework
+    @param config: { Profiling: boolean? }
+    Starts the framework, initializing and starting all providers.
 
-	[Open Documentation](https://lumin-org.github.io/framework/api/#start)
+	```lua
+	framework.start({
+		Profiling = true,
+	})
+	```
 ]=]
-local function Start(config: { Profiling: boolean? }?)
-	assert(not Started, "AlreadyStarted")
-
+function framework.Start(config: { Profiling: boolean? }?)
+	assert(not framework.STARTED, "AlreadyStarted")
 	if config then
-		-- Set configurations
-		Profiling = config.Profiling or Profiling
+		framework.PROFILING = config.Profiling or framework.PROFILING
 	end
-
-	-- Default provider properties
-	for _, provider in AddedProviders do
-        provider.Order = provider.Order or 1 -- Default order (no order)
-        ProviderCount += 1
-		local DefaultName = provider.Name or `provider-{ProviderCount}`
-		if not table.find(ProviderNames, DefaultName) then
-            provider.Name = DefaultName -- Default naming scheme
-			table.insert(ProviderNames, DefaultName)
-		end
-        table.freeze(provider)
+	for _, provider in framework.ADDED_PROVIDERS do
+		framework:InitProvider(provider)
 	end
-
-	-- Sort by load order, least to greatest
-	table.sort(AddedProviders, function(a: any, b: any)
-		return a.Order < b.Order
-	end)
-
-	for _, provider in AddedProviders do
-        StartLifecycles(provider)
-		InitDependencies(provider)
-		InitProvider(provider)
+	for _, provider in framework.INITIATED_PROVIDERS do
+		framework:StartProvider(provider)
 	end
-
-	for _, provider in InitiatedProviders do
-		StartProvider(provider)
-	end
-
-	Started = true
-
-	table.freeze(AddedProviders)
+	framework.STARTED = true
+	table.freeze(framework.ADDED_PROVIDERS)
 end
 
 -- Debugger
 
-Debugger.set({
-	Logs = Logs,
-	Name = "Framework",
-	URL = "https://lumin-org.github.io/framework/guide/errors#",
-})
+debugger.set("Framework", framework.LOGS, "https://lumin-org.github.io/framework/guide/errors#")
 
--- Types
-
-export type Provider<T> = Types.Provider<T>
-export type Lifecycle<T...> = Types.Lifecycle<T...>
-
--- Module
-
-return table.freeze({
-	Start = Start,
-	Add = Add,
-	Lifecycle = Lifecycle,
-})
+-- Return the framework API
+return {
+	version,
+	start = framework.Start,
+	add = framework.Add,
+}
