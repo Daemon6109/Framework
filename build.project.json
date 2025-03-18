@@ -1,0 +1,7 @@
+{
+  "name": "Framework",
+  "emitLegacyScripts": false,
+  "tree": {
+    "$path": "dist/src/Framework"
+  }
+}

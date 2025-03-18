@@ -1,24 +1,33 @@
 -------------------------------------------------------------------------------
--- framework.luau
--- A framework for managing providers in Roblox with dependency handling and profiling.
+-- Framework
+-- @Daemon6109 (Matthew Radulovich)
 --------------------------------------------------------------------------------
 
-local version = { major = 1, minor = 0, patch = 0 }
+local version = { major = 11, minor = 0, patch = 0 }
 
-local debugger = require(script.Parent.roblox_packages.debugger)
+local Debugger = require("@Packages/Debugger")
 
--- Define the Provider type with specific fields
-type Provider = {
-	init: (() -> ())?, -- Optional initialization function
-	name: string, -- Name of the provider
-	start: (() -> ())?, -- Optional start function
-}
+--[=[
+	Framework
+	A simple framework for managing providers in Roblox with initialization and startup sequencing.
+	Providers are initialized and started in the order specified by their `order` field.
+	Each provider can have optional `init` and `start` functions. Providers can require other providers
+	they depend on within their `init` or `start` methods as needed.
+	Memory profiling can be enabled for debugging purposes.
+	
+	Usage:
+	1. Create providers as ModuleScripts that return a table with optional `init`, `start`, and `order`.
+	2. Add providers using Framework.add({provider1, provider2, ...})
+	3. Initialize the framework using Framework.init({Profiling = true/false})
+	
+	Note: The `init` and `start` methods are called synchronously in the specified order. If a provider
+	depends on another, it should require that provider within its own `init` or `start` method.
 
-local assert: <T>(T, string, ...any) -> T = debugger.assert
-local fatal = debugger.fatal
+	@class Framework
+]=]
+local Framework = {
+	version,
 
--- Framework object to manage providers
-local framework = {
 	STARTED = false, -- Tracks if the framework has started
 	PROFILING = false, -- Enables memory profiling if true
 	ADDED_PROVIDERS = {} :: { Provider }, -- Stores all added providers
@@ -26,34 +35,84 @@ local framework = {
 
 	-- Centralized error messages
 	LOGS = {
-		AlreadyStarted = "Framework has already started",
-		FatalInit = "Init errored: %s",
-		FatalAddModule = "Added module errored: %s",
-		ReservedName = "'%s' is a reserved %s name",
-		InvalidType = "Expected type %s; got '%s'",
+		ALREADY_STARTED = "Framework has already started",
+		FATAL_INIT = "Init errored: %s",
+		FATAL_ADD_MODULE = "Added module errored: %s",
 	},
 }
+export type Framework = {
+	version: { major: number, minor: number, patch: number },
+	add: (self: Framework, { any }) -> (),
+	init: (self: Framework, { Profiling: boolean? }?) -> (),
+}
 
-type Framework = typeof(framework)
+type FrameworkInternal = {
+	STARTED: boolean,
+	PROFILING: boolean,
+	ADDED_PROVIDERS: { Provider },
+	INITIATED_PROVIDERS: { Provider },
+	LOGS: { [string]: string },
+	isInitiated: (self: FrameworkInternal, Provider) -> boolean,
+	startProvider: (self: FrameworkInternal, Provider) -> (),
+	initProvider: (self: FrameworkInternal, Provider) -> (),
+	add: (self: FrameworkInternal, { Instance }) -> (),
+	init: (self: FrameworkInternal, { Profiling: boolean? }) -> (),
+}
 
 --[=[
-	@method IsInitiated
+	A provider that can be added to the framework.
+	Providers can have optional `init` and `start` functions that are called in order.
+	`init` is called once and `start` is called every time the framework is started.
+	`order` can be used to specify the order in which providers are initialized and started.
+
+	@private
 	@within Framework
-	@param provider: Provider
-	@return boolean
-	Helper function to check if a provider has been initiated
+	@interface Provider
+	.init? (() -> ()) -- Optional initialization function
+	.name string -- Name of the provider
+	.start? (() -> ()) -- Optional start function
+	.order? number -- Optional order for initialization and starting
 ]=]
-function framework.IsInitiated(self: Framework, provider: Provider): boolean
+type Provider = {
+	init: (() -> ())?, -- Optional initialization function
+	name: string, -- Name of the provider
+	start: (() -> ())?, -- Optional start function
+	order: number?, -- Optional order for initialization and starting
+}
+
+local assert = Debugger.assert
+local fatal = Debugger.fatal
+
+--[=[
+	Checks if a provider has been initiated.
+
+	@private
+	@method isInitiated
+	@within Framework
+	@param provider Provider -- The provider to check
+	@return boolean -- True if the provider has been initiated
+
+	```lua
+	local initiated = Framework:isInitiated(provider)
+	```
+]=]
+function Framework.isInitiated(self: FrameworkInternal, provider: Provider): boolean
 	return table.find(self.INITIATED_PROVIDERS, provider) ~= nil
 end
 
 --[=[
-    @method StartProvider
-    @within Framework 
-    @param provider: Provider
-    Starts the provider if it has a start function.
+	Starts the provider if it has a start function.
+
+	@private
+	@method startProvider
+	@within Framework 
+	@param provider Provider -- The provider to start
+
+	```lua
+	Framework:startProvider(provider)
+	```
 ]=]
-function framework.StartProvider(self: Framework, provider: Provider)
+function Framework.startProvider(self: FrameworkInternal, provider: Provider)
 	if provider.start then
 		local argType = type(provider.start)
 		assert(argType == "function", "InvalidType", "function", argType)
@@ -65,89 +124,93 @@ function framework.StartProvider(self: Framework, provider: Provider)
 end
 
 --[=[
-    @method InitProvider
-    @within Framework 
-    @param provider: Provider
-    Initializes the provider if it has an init function and hasn't been initiated yet.
+	Initializes the provider if it has an init function and hasn't been initiated yet.
+
+	@private
+	@method initProvider
+	@within Framework 
+	@param provider Provider -- The provider to initialize
+
+	```lua
+	Framework:initProvider(provider)
+	```
 ]=]
-function framework.InitProvider(self: Framework, provider: Provider)
-	if provider.init and not self:IsInitiated(provider) then
+function Framework.initProvider(self: FrameworkInternal, provider: Provider)
+	if provider.init and not self:isInitiated(provider) then
 		local argType = type(provider.init)
 		assert(argType == "function", "InvalidType", "function", argType)
-		local success, result: debugger.ParsedError = xpcall(function()
+		local success, result: Debugger.Parsed = xpcall(function()
 			if self.PROFILING then
 				debug.setmemorycategory(provider.name)
 			end
 			provider.init()
-		end, debugger.parse)
+		end, Debugger.parse)
 		if not success then
-			fatal("FatalInit", result.Message)
+			fatal("FATAL_INIT", result.message)
 		end
 	end
 	table.insert(self.INITIATED_PROVIDERS, provider)
 end
 
 --[=[
-    @method Add
-    @within Framework
-    @param providers: { Instance }
-    Adds providers to the framework to be initialized and started.
+	Adds providers to the framework to be initialized and started.
+
+	@method add
+	@within Framework
+	@param providers {Instance} -- A list of providers to add
 
 	```lua
-	framework.add({
-		script.Parent.MyProvider,
-	})
+	Framework:add({ provider1, provider2 })
 	```
 ]=]
-function framework.Add(providers: { Instance })
-	assert(not framework.STARTED, "AlreadyStarted")
+function Framework.add(self: FrameworkInternal, providers: { Instance })
+	assert(not self.STARTED, "ALREADY_STARTED")
 	for _, module in providers do
 		if not module:IsA("ModuleScript") then
+			warn(string.format("Skipping non-ModuleScript instance: %s", module.Name))
 			continue
 		end
 		local success, result = pcall(require, module)
-		assert(success, "FatalAddModule", result)
+		if not success then
+			fatal("FATAL_ADD_MODULE", result)
+		end
 		assert(type(result) == "table", "InvalidType", "table", type(result))
 		result.name = module.Name
 		result.order = result.order or 1
-		table.insert(framework.ADDED_PROVIDERS, result)
+		table.insert(self.ADDED_PROVIDERS, result)
 	end
 end
 
 --[=[
-    @method Start
-    @within Framework
-    @param config: { Profiling: boolean? }
-    Starts the framework, initializing and starting all providers.
+	Initializes the framework, initializing and starting all providers in order.
+
+	@method init
+	@within Framework
+	@param config {Profiling: boolean?} -- Optional configuration
 
 	```lua
-	framework.start({
-		Profiling = true,
-	})
+	Framework:init({ Profiling = true })
 	```
 ]=]
-function framework.Start(config: { Profiling: boolean? }?)
-	assert(not framework.STARTED, "AlreadyStarted")
+function Framework.init(self: FrameworkInternal, config: { Profiling: boolean? }?)
+	assert(not self.STARTED, "ALREADY_STARTED")
 	if config then
-		framework.PROFILING = config.Profiling or framework.PROFILING
+		self.PROFILING = config.Profiling or self.PROFILING
 	end
-	for _, provider in framework.ADDED_PROVIDERS do
-		framework:InitProvider(provider)
+	-- Sort providers based on order
+	table.sort(self.ADDED_PROVIDERS, function(a: Provider, b: Provider)
+		return (a.order or 1) < (b.order or 1)
+	end)
+	for _, provider in self.ADDED_PROVIDERS do
+		self:initProvider(provider)
+		self:startProvider(provider)
 	end
-	for _, provider in framework.INITIATED_PROVIDERS do
-		framework:StartProvider(provider)
-	end
-	framework.STARTED = true
-	table.freeze(framework.ADDED_PROVIDERS)
+	self.STARTED = true
+	table.freeze(self.ADDED_PROVIDERS)
 end
 
--- Debugger
-
-debugger.set("Framework", framework.LOGS, "https://lumin-org.github.io/framework/guide/errors#")
+-- Debugger setup
+Debugger.set("Framework", Framework.LOGS, "https://lumin-org.github.io/framework/guide/errors#")
 
 -- Return the framework API
-return {
-	version,
-	start = framework.Start,
-	add = framework.Add,
-}
+return (Framework :: any) :: Framework

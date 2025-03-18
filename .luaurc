@@ -1,3 +1,13 @@
 {
-	"languageMode": "strict"
+	"languageMode": "strict",
+	"lint": {
+		"*": true,
+		"LocalUnused": false
+	},
+	"lintErrors": true,
+	"aliases": {
+		"Packages": "roblox_packages",
+		"Project": "src",
+		"lune": "~/.lune/.typedefs/0.8.9/"
+	}
 }

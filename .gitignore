@@ -1,18 +1,19 @@
-# Pesde
-.pesde
-roblox_packages
-lune_packages
-luau_packages
+/*.rbxlx.lock
+/*.rbxlx
+/*.rbxl.lock
+/*.rbxl
+/*.rbxm.lock
+/*.rbxm
+
+build/
+
+dist/
+
 pesde.lock
+.pesde
 
-# Rojo
+luau_packages/
+lune_packages/
+roblox_packages/
+
 sourcemap.json
-
-# Rbxts
-out
-
-# Code
-.vscode
-
-# Rokit
-rokit.toml

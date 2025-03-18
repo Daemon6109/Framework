@@ -1,0 +1,21 @@
+title = "Framework"
+gitRepoUrl = "https://github.com/Daemon6109/Framework"
+gitSourceBranch = "main"
+changelog = true
+
+[docusaurus]
+onBrokenLinks = "throw"
+onBrokenMarkdownLinks = "warn"
+organizationName = "Daemon6109"
+projectName = "Framework"
+url = "https://Daemon6109.github.io/"
+baseUrl = "/Framework"
+
+[footer]
+style = "dark"
+
+[[footer.links]]
+title = "Framework"
+
+[home]
+includeReadme = true
