@@ -17,4 +17,4 @@ darklua process --config .darklua.json scripts/run-tests.server.luau dist/run-te
 echo "Building with rojo..."
 rojo build dev.project.json --output "$OUTPUT" &&
 echo "Running tests in Roblox..."
-run-in-roblox --place "$OUTPUT" --script dist/run-tests.server.luau
+run-in-roblox --place "$OUTPUT" --script dist/run-tests.server.luau --port 56000

@@ -42,7 +42,7 @@ local Framework = {
 }
 export type Framework = {
 	version: { major: number, minor: number, patch: number },
-	add: (self: Framework, { any }) -> (),
+	add: (self: Framework, { Instance }) -> (),
 	init: (self: Framework, { Profiling: boolean? }?) -> (),
 }
 
