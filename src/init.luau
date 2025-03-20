@@ -38,6 +38,7 @@ local Framework = {
 		ALREADY_STARTED = "Framework has already started",
 		FATAL_INIT = "Init errored: %s",
 		FATAL_ADD_MODULE = "Added module errored: %s",
+		INVALID_TYPE = "Expected type %s; got '%s'",
 	},
 }
 export type Framework = {
@@ -115,7 +116,7 @@ end
 function Framework.startProvider(self: FrameworkInternal, provider: Provider)
 	if provider.start then
 		local argType = type(provider.start)
-		assert(argType == "function", "InvalidType", "function", argType)
+		assert(argType == "function", "INVALID_TYPE", "function", argType)
 		if self.PROFILING then
 			debug.setmemorycategory(provider.name)
 		end
@@ -138,7 +139,7 @@ end
 function Framework.initProvider(self: FrameworkInternal, provider: Provider)
 	if provider.init and not self:isInitiated(provider) then
 		local argType = type(provider.init)
-		assert(argType == "function", "InvalidType", "function", argType)
+		assert(argType == "function", "INVALID_TYPE", "function", argType)
 		local success, result: Debugger.Parsed = xpcall(function()
 			if self.PROFILING then
 				debug.setmemorycategory(provider.name)
@@ -174,7 +175,7 @@ function Framework.add(self: FrameworkInternal, providers: { Instance })
 		if not success then
 			fatal("FATAL_ADD_MODULE", result)
 		end
-		assert(type(result) == "table", "InvalidType", "table", type(result))
+		assert(type(result) == "table", "INVALID_TYPE", "table", type(result))
 		result.name = module.Name
 		result.order = result.order or 1
 		table.insert(self.ADDED_PROVIDERS, result)
@@ -201,8 +202,12 @@ function Framework.init(self: FrameworkInternal, config: { Profiling: boolean? }
 	table.sort(self.ADDED_PROVIDERS, function(a: Provider, b: Provider)
 		return (a.order or 1) < (b.order or 1)
 	end)
+	-- Initialize providers
 	for _, provider in self.ADDED_PROVIDERS do
 		self:initProvider(provider)
+	end
+	-- Start providers
+	for _, provider in self.ADDED_PROVIDERS do
 		self:startProvider(provider)
 	end
 	self.STARTED = true

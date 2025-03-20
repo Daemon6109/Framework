@@ -4,6 +4,12 @@
 
 local version = { major = 1, minor = 0, patch = 0 }
 
+local JestGlobals = require("@Packages/JestGlobals")
+local Jest = JestGlobals.jest
+
+local STARTED_CALLED = Jest.fn()
+local INIT_CALLED = Jest.fn()
+
 --[=[
    This function is used to start the provider and initialize any necessary systems.
 
@@ -13,6 +19,7 @@ local version = { major = 1, minor = 0, patch = 0 }
 ]=]
 local function start()
 	-- Initialize or start the provider logic here
+	STARTED_CALLED()
 end
 
 --[=[
@@ -24,10 +31,15 @@ end
 ]=]
 local function init()
 	-- Set up any initialization logic here
+	INIT_CALLED()
 end
 
 return {
 	version = version,
+
+	-- Constants
+	STARTED_CALLED = STARTED_CALLED,
+	INIT_CALLED = INIT_CALLED,
 
 	-- Functions
 	start = start,
