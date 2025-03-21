@@ -5,6 +5,8 @@
 /*.rbxm.lock
 /*.rbxm
 
+lib/
+
 build/
 
 dist/
