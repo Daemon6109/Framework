@@ -6,10 +6,10 @@ local processServiceExists, ProcessService = pcall(function()
 	return game:GetService("ProcessService")
 end)
 
-local status, result = runCLI(ReplicatedStorage.Packages.Project, {
+local status, result = runCLI(ReplicatedStorage.Project, {
 	verbose = false,
 	ci = false,
-}, { ReplicatedStorage.Packages.Project }):awaitStatus()
+}, { ReplicatedStorage.Project }):awaitStatus()
 
 if status == "Rejected" then
 	print(result)

@@ -1,20 +1,21 @@
 name = "daemon/framework"
-version = "11.0.0"
-description = "A featherlight framework for Luau games"
+version = "11.0.3"
+description = "A featherlight and quick framework for Roblox experiences."
 authors = ["Daemon6109"]
 repository = "https://github.com/Daemon6109/framework"
 license = "MIT"
 includes = [
-    "dist/src/Framework",
+    "dist/src/Framework/**",
     "pesde.toml",
     "README.md",
     "LICENSE"
 ]
 
+
 [target]
 environment = "roblox"
 lib = "dist/src/Framework/init.luau"
-build_files = ["dist/src/Framework"]
+build_files = ["dist/src"]
 
 [indices]
 default = "https://github.com/daimond113/pesde-index"

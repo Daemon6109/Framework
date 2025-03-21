@@ -3,6 +3,6 @@ return {
 		"**/__tests__/*.(spec|test)",
 	},
 	testPathIgnorePatterns = {
-		"Packages",
+		"roblox_packages",
 	},
 }

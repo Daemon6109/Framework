@@ -3,7 +3,7 @@
 -- @Daemon6109 (Matthew Radulovich)
 --------------------------------------------------------------------------------
 
-local version = { major = 11, minor = 0, patch = 0 }
+local version = { major = 11, minor = 0, patch = 3 }
 
 local Debugger = require("@Packages/Debugger")
 
