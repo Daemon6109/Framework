@@ -4,7 +4,7 @@
 -- @Daemon6109 (Matthew Radulovich)
 --------------------------------------------------------------------------------
 
-local Framework = require("@Project")
+local Framework = require("@Project/Framework")
 local JestGlobals = require("@Packages/JestGlobals")
 
 local mocks = script.Parent.Parent.__mocks__

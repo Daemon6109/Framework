@@ -5,7 +5,7 @@ authors = ["Daemon6109"]
 repository = "https://github.com/Daemon6109/framework"
 license = "MIT"
 includes = [
-    "dist/src",
+    "dist/src/Framework",
     "pesde.toml",
     "README.md",
     "LICENSE"
@@ -13,8 +13,8 @@ includes = [
 
 [target]
 environment = "roblox"
-lib = "dist/init.luau"
-build_files = ["dist"]
+lib = "dist/src/Framework/init.luau"
+build_files = ["dist/src/Framework"]
 
 [indices]
 default = "https://github.com/daimond113/pesde-index"

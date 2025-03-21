@@ -20,8 +20,8 @@ local Debugger = require("@Packages/Debugger")
 	2. Add providers using Framework.add({provider1, provider2, ...})
 	3. Initialize the framework using Framework.init({Profiling = true/false})
 	
-	Note: The `init` and `start` methods are called synchronously in the specified order. If a provider
-	depends on another, it should require that provider within its own `init` or `start` method.
+	Note: Providers are initialized and started in the order specified by their `order` field. If no order is specified,
+	providers are initialized and started in the order they were added.
 
 	@class Framework
 ]=]
@@ -215,7 +215,7 @@ function Framework.init(self: FrameworkInternal, config: { Profiling: boolean? }
 end
 
 -- Debugger setup
-Debugger.set("Framework", Framework.LOGS, "https://lumin-org.github.io/framework/guide/errors#")
+Debugger.set("Framework", Framework.LOGS, "https://daemon6109.github.io/Framework")
 
 -- Return the framework API
 return (Framework :: any) :: Framework
