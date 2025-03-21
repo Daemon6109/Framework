@@ -2,6 +2,16 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "Publish",
+            "type": "shell",
+            "command": "./scripts/publish.sh",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
             "label": "Build",
             "type": "shell",
             "command": "./scripts/build.sh",

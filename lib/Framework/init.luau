@@ -5,8 +5,7 @@
 
 local version = { major = 11, minor = 0, patch = 5 }
 
-local Debugger = require("@Packages/Debugger")
-
+local Debugger = require(script.Parent.Parent.roblox_packages.Debugger)
 --[=[
 	Framework
 	A simple framework for managing providers in Roblox with initialization and startup sequencing.
@@ -25,6 +24,7 @@ local Debugger = require("@Packages/Debugger")
 
 	@class Framework
 ]=]
+
 local Framework = {
 	version,
 
@@ -44,7 +44,7 @@ local Framework = {
 export type Framework = {
 	version: { major: number, minor: number, patch: number },
 	add: (self: Framework, { Instance }) -> (),
-	init: (self: Framework, { Profiling: boolean? }?) -> (),
+	init: (self: Framework, { Profiling: boolean? }?) -> ()
 }
 
 type FrameworkInternal = {
@@ -57,7 +57,7 @@ type FrameworkInternal = {
 	startProvider: (self: FrameworkInternal, Provider) -> (),
 	initProvider: (self: FrameworkInternal, Provider) -> (),
 	add: (self: FrameworkInternal, { Instance }) -> (),
-	init: (self: FrameworkInternal, { Profiling: boolean? }) -> (),
+	init: (self: FrameworkInternal, { Profiling: boolean? }) -> ()
 }
 
 --[=[
@@ -78,7 +78,7 @@ type Provider = {
 	init: (() -> ())?, -- Optional initialization function
 	name: string, -- Name of the provider
 	start: (() -> ())?, -- Optional start function
-	order: number?, -- Optional order for initialization and starting
+	order: number?
 }
 
 local assert = Debugger.assert
